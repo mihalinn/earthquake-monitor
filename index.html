@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>地震マップ</title>
+    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- アイコンレール -->
+<nav id="rail">
+    <div id="rail-tabs">
+        <button class="rail-btn active" data-panel="monitor" title="強震モニタ">
+            <i class="fa-solid fa-wave-square"></i>
+        </button>
+        <button class="rail-btn" data-panel="eew" title="緊急地震速報">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span class="rail-badge" id="eew-badge" style="display:none"></span>
+        </button>
+        <button class="rail-btn" data-panel="eqinfo" title="地震情報">
+            <i class="fa-solid fa-circle-dot"></i>
+        </button>
+        <button class="rail-btn" data-panel="tsunami" title="津波情報">
+            <i class="fa-solid fa-water"></i>
+        </button>
+    </div>
+
+    <div id="rail-bottom">
+        <button class="rail-btn" data-panel="settings" title="設定">
+            <i class="fa-solid fa-gear"></i>
+        </button>
+    </div>
+</nav>
+
+<!-- スライドパネル -->
+<div id="slide-panel">
+
+    <!-- 強震モニタ -->
+    <div class="panel" id="panel-monitor">
+        <div class="panel-header">強震モニタ</div>
+
+        <div class="panel-section" style="margin-top:auto">
+            <div class="sec-label">現在の最大震度</div>
+            <div class="intensity-row">
+                <div class="int-badge int-none" id="max-int-badge">−</div>
+                <div>
+                    <div class="int-value" id="max-int-value">計測値  −−</div>
+                    <div class="int-point" id="max-int-point">−−</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- EEW -->
+    <div class="panel" id="panel-eew">
+        <div class="panel-header">緊急地震速報</div>
+        <div class="panel-empty">
+            <i class="fa-solid fa-shield-check"></i>
+            <span>発令なし</span>
+        </div>
+    </div>
+
+    <!-- 地震情報 -->
+    <div class="panel" id="panel-eqinfo">
+        <div class="panel-header">地震情報</div>
+        <div class="panel-empty">
+            <i class="fa-solid fa-circle-notch fa-spin"></i>
+            <span>準備中</span>
+        </div>
+    </div>
+
+    <!-- 津波情報 -->
+    <div class="panel" id="panel-tsunami">
+        <div class="panel-header">津波情報</div>
+        <div class="panel-empty">
+            <i class="fa-solid fa-water"></i>
+            <span>津波情報なし</span>
+        </div>
+    </div>
+
+    <!-- 設定 -->
+    <div class="panel" id="panel-settings">
+        <div class="panel-header">設定</div>
+        <div class="panel-section">
+            <div class="sec-label">接続状態</div>
+            <div class="status-row">
+                <span class="dot dot-off" id="kmoni-dot"></span>
+                <span id="kmoni-status">強震モニタ: 未接続</span>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- 地図 -->
+<div id="map">
+    <div id="map-clock">
+        <div id="map-clock-date">----/--/-- (−)</div>
+        <div id="map-clock-time">--:--:--</div>
+    </div>
+    <div id="map-br">
+        <div id="int-scale">
+            <div id="int-scale-bar"></div>
+            <div id="int-scale-labels">
+                <span>7</span>
+                <span>6強</span>
+                <span>6弱</span>
+                <span>5強</span>
+                <span>5弱</span>
+                <span>4</span>
+                <span>3</span>
+                <span>2</span>
+                <span>1</span>
+            </div>
+        </div>
+        <button id="home-btn" title="ホームに戻る">
+            <i class="fa-solid fa-house"></i>
+        </button>
+    </div>
+</div>
+
+<canvas id="kmoni-canvas" width="352" height="400" style="display:none"></canvas>
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/topojson-client@3"></script>
+<script src="js/map.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/kmoni.js"></script>
+</body>
+</html>
