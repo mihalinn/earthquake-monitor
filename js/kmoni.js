@@ -135,6 +135,7 @@ function processGif(ts) {
 
 // ── メインループ ─────────────────────────────────────────────
 async function kmoniLoop() {
+    if (simMode) return;
     try {
         const res  = await fetch('/api/kmoni/latest');
         if (!res.ok) throw new Error(`latest ${res.status}`);
@@ -154,9 +155,76 @@ async function kmoniLoop() {
     setTimeout(kmoniLoop, 1000);
 }
 
+// ── シミュレーション ──────────────────────────────────────────
+let simMode = false;
+let simDate = null;
+let simTimer = null;
+
+function simTs(d) {
+    const p = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+}
+
+function simUpdateClock(d) {
+    const p = n => String(n).padStart(2, '0');
+    document.getElementById('map-clock-time').textContent =
+        `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+    document.getElementById('map-clock-date').textContent =
+        `${d.getFullYear()}/${p(d.getMonth()+1)}/${p(d.getDate())} [再生中]`;
+    document.getElementById('sim-time').textContent =
+        `${d.getFullYear()}/${p(d.getMonth()+1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
+async function simStep() {
+    if (!simMode) return;
+    const speed = parseInt(document.getElementById('sim-speed').value) || 1;
+    simUpdateClock(simDate);
+    try {
+        await processGif(simTs(simDate));
+    } catch(e) {
+        console.warn('[sim] データなし:', simTs(simDate));
+    }
+    simDate = new Date(simDate.getTime() + 1000);
+    simTimer = setTimeout(simStep, 1000 / speed);
+}
+
+function startSim() {
+    const val = document.getElementById('sim-datetime').value;
+    if (!val) return;
+    simMode = true;
+    simDate = new Date(val);
+    if (simTimer) clearTimeout(simTimer);
+    const btn = document.getElementById('sim-play-btn');
+    btn.textContent = '⏹ 停止';
+    btn.classList.add('active');
+    setStatus('on');
+    simStep();
+}
+
+function stopSim() {
+    simMode = false;
+    if (simTimer) { clearTimeout(simTimer); simTimer = null; }
+    const btn = document.getElementById('sim-play-btn');
+    btn.textContent = '▶ 再生';
+    btn.classList.remove('active');
+    document.getElementById('sim-time').textContent = '';
+    kmoniLoop();
+}
+
 // ── 起動 ────────────────────────────────────────────────────
 async function startKmoni() {
     await loadObsPoints();
+
+    document.getElementById('sim-play-btn').addEventListener('click', () => {
+        simMode ? stopSim() : startSim();
+    });
+
+    document.querySelectorAll('.sim-preset').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.getElementById('sim-datetime').value = btn.dataset.ts;
+        });
+    });
+
     kmoniLoop();
 }
 

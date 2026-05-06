@@ -41,6 +41,27 @@
     <div class="panel" id="panel-monitor">
         <div class="panel-header">強震モニタ</div>
 
+        <!-- 過去データ再生 -->
+        <div class="panel-section" id="sim-section">
+            <div class="sec-label">過去データ再生</div>
+            <div class="sim-presets">
+                <button class="sim-preset" data-ts="2024-01-01T16:10">能登半島 2024</button>
+                <button class="sim-preset" data-ts="2022-03-16T23:36">福島沖 2022</button>
+                <button class="sim-preset" data-ts="2016-04-16T01:25">熊本 2016</button>
+            </div>
+            <input type="datetime-local" id="sim-datetime" class="sim-input">
+            <div class="sim-row">
+                <button id="sim-play-btn" class="sim-play-btn">▶ 再生</button>
+                <select id="sim-speed" class="sim-speed">
+                    <option value="1">1×</option>
+                    <option value="2">2×</option>
+                    <option value="5">5×</option>
+                    <option value="10">10×</option>
+                </select>
+            </div>
+            <div id="sim-time" class="sim-time"></div>
+        </div>
+
         <div class="panel-section" style="margin-top:auto">
             <div class="sec-label">現在の最大震度</div>
             <div class="intensity-row">
