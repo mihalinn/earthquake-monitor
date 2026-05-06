@@ -135,7 +135,7 @@ function processGif(ts) {
 
 // ── メインループ ─────────────────────────────────────────────
 async function kmoniLoop() {
-    if (simMode) return;
+    if (typeof simMode !== 'undefined' && simMode) return;
     try {
         const res  = await fetch('/api/kmoni/latest');
         if (!res.ok) throw new Error(`latest ${res.status}`);
@@ -154,76 +154,253 @@ async function kmoniLoop() {
     }
     setTimeout(kmoniLoop, 1000);
 }
-
-// ── シミュレーション ──────────────────────────────────────────
-let simMode = false;
-let simDate = null;
-let simTimer = null;
-
-function simTs(d) {
-    const p = n => String(n).padStart(2, '0');
-    return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
-}
-
-function simUpdateClock(d) {
-    const p = n => String(n).padStart(2, '0');
-    document.getElementById('map-clock-time').textContent =
-        `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
-    document.getElementById('map-clock-date').textContent =
-        `${d.getFullYear()}/${p(d.getMonth()+1)}/${p(d.getDate())} [再生中]`;
-    document.getElementById('sim-time').textContent =
-        `${d.getFullYear()}/${p(d.getMonth()+1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
-}
-
-async function simStep() {
-    if (!simMode) return;
-    const speed = parseInt(document.getElementById('sim-speed').value) || 1;
-    simUpdateClock(simDate);
-    try {
-        await processGif(simTs(simDate));
-    } catch(e) {
-        console.warn('[sim] データなし:', simTs(simDate));
+// ── HSV多項式補間による震度計算（圧縮ノイズ耐性） ──────────────
+// 参考: https://qiita.com/NoneType1/items/a4d2cf932e20b56ca444
+function rgbToHsv(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    const d = max - min;
+    let h = 0, s = max === 0 ? 0 : d / max, v = max;
+    if (d !== 0) {
+        switch (max) {
+            case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+            case g: h = (b - r) / d + 2; break;
+            case b: h = (r - g) / d + 4; break;
+        }
+        h /= 6;
     }
-    simDate = new Date(simDate.getTime() + 1000);
-    simTimer = setTimeout(simStep, 1000 / speed);
+    return [h, s, v];
 }
 
-function startSim() {
-    const val = document.getElementById('sim-datetime').value;
-    if (!val) return;
-    simMode = true;
-    simDate = new Date(val);
-    if (simTimer) clearTimeout(simTimer);
-    const btn = document.getElementById('sim-play-btn');
-    btn.textContent = '⏹ 停止';
-    btn.classList.add('active');
-    setStatus('on');
-    simStep();
+function getClosestIntensity(r, g, b) {
+    const [h, s, v] = rgbToHsv(r, g, b);
+
+    // 彩度が低すぎる（グレー・白・背景）は除外
+    if (s < 0.5) return -3.0;
+    // 極端に暗い or 極端に明るいピクセルを除外
+    if (v < 0.15 || v > 0.98) return -3.0;
+
+    let p = 0;
+    if (h > 0.1476) {
+        // 青〜黄 (位置 0.0〜0.6)
+        p = 280.31*h**6 - 916.05*h**5 + 1142.6*h**4 - 709.95*h**3 + 234.65*h**2 - 40.27*h + 3.2217;
+    } else if (h > 0.001) {
+        // オレンジ〜赤 (位置 0.6〜0.9)
+        p = 151.4*h**4 - 49.32*h**3 + 6.753*h**2 - 2.481*h + 0.9033;
+    } else {
+        // 深赤（明度で変化）(位置 0.9〜1.0)
+        if (s < 0.8) return -3.0; // 県境グレーの誤検知対策
+        p = -0.005171*v**2 - 0.3282*v + 1.2236;
+    }
+
+    p = Math.max(0, Math.min(1, p));
+    const result = 10 * p - 3; // 位置(0〜1) → 震度(-3〜7)
+
+    // 震度6強以上の誤検知抑制（彩度が極めて高い場合のみ許容）
+    if (result > 6.0 && s < 0.85) return -3.0;
+
+    return result;
 }
 
-function stopSim() {
-    simMode = false;
-    if (simTimer) { clearTimeout(simTimer); simTimer = null; }
-    const btn = document.getElementById('sim-play-btn');
-    btn.textContent = '▶ 再生';
-    btn.classList.remove('active');
-    document.getElementById('sim-time').textContent = '';
-    kmoniLoop();
+// ── ビデオ連動シミュレーション ─────────────────────────────────
+let simMode = false;
+let simInterval = null;
+const OFFSET_X = 0;
+const OFFSET_Y = 0;
+
+function processVideoFrame() {
+    const videoEl = document.getElementById('sim-video');
+    if (!simMode || !videoEl) return;
+
+    const cx = parseFloat(document.getElementById('sim-crop-x')?.value) ?? 124;
+    const cy = parseFloat(document.getElementById('sim-crop-y')?.value) ?? -1;
+    const cw = parseFloat(document.getElementById('sim-crop-w')?.value) ?? 352;
+    const ch = parseFloat(document.getElementById('sim-crop-h')?.value) ?? 400;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(videoEl, cx, cy, cw, ch, 0, 0, canvas.width, canvas.height);
+    const px = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    const features = [];
+    let maxV = -3.0, maxName = '';
+
+    for (const p of obsPoints) {
+        if (!p.point?.center_point || !p.location) continue;
+        
+        const scx = Math.round(p.point.center_point.x + OFFSET_X);
+        const scy = Math.round(p.point.center_point.y + OFFSET_Y);
+        
+        let localMaxV = -3.0;
+
+        // 【新兵器】中心と上下左右の1ピクセル（計5マス）だけを確認する
+        const searchOffsets = [
+            {dx: 0, dy: 0},   // 中心
+            {dx: 0, dy: -1},  // 上
+            {dx: 0, dy: 1},   // 下
+            {dx: -1, dy: 0},  // 左
+            {dx: 1, dy: 0}    // 右
+        ];
+
+        for (const offset of searchOffsets) {
+            const targetX = scx + offset.dx;
+            const targetY = scy + offset.dy;
+            
+            if (targetX < 0 || targetX >= canvas.width || targetY < 0 || targetY >= canvas.height) continue;
+
+            const idx = (targetY * canvas.width + targetX) * 4;
+            const v = getClosestIntensity(px[idx], px[idx+1], px[idx+2]);
+            
+            if (v > localMaxV) {
+                localMaxV = v;
+            }
+        }
+
+        if (localMaxV <= -3.0) continue;
+
+        features.push({
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: [p.location.longitude, p.location.latitude] },
+            properties: {
+                name: p.name,
+                intensity: localMaxV,
+                color: intensityColor(localMaxV),
+                size:  intensitySize(localMaxV),
+            }
+        });
+        if (localMaxV > maxV) { maxV = localMaxV; maxName = p.name || ''; }
+    }
+
+    // デバッグ表示がONなら、サンプリング点に赤い点を描画（getImageDataの後に描画することで判定には影響させない）
+    const debugMode = document.getElementById('sim-debug-toggle')?.checked;
+    if (debugMode) {
+        ctx.fillStyle = '#ff0000';
+        for (const p of obsPoints) {
+            if (!p.point?.center_point) continue;
+            ctx.fillRect(p.point.center_point.x, p.point.center_point.y, 1, 1);
+        }
+    }
+
+    map.getSource('kmoni-points').setData({ type: 'FeatureCollection', features });
+
+    const badge   = document.getElementById('sim-max-int-badge');
+    const valueEl = document.getElementById('sim-max-int-value');
+    const pointEl = document.getElementById('sim-max-int-point');
+    const info    = floatToJmaClass(maxV);
+
+    if (info) {
+        badge.className = 'int-badge ' + info.cls;
+        badge.style.background = '';
+        badge.textContent = info.label;
+    } else {
+        badge.className = 'int-badge';
+        badge.style.background = intensityColor(maxV);
+        badge.textContent = maxV.toFixed(1);
+    }
+    valueEl.textContent = `計測値  ${maxV.toFixed(1)}`;
+    pointEl.textContent = maxName || '−−';
+
+    const pCtx = document.getElementById('sim-preview-canvas')?.getContext('2d');
+    if (pCtx) {
+        pCtx.clearRect(0, 0, 352, 400);
+        pCtx.drawImage(canvas, 0, 0);
+    }
 }
 
 // ── 起動 ────────────────────────────────────────────────────
 async function startKmoni() {
     await loadObsPoints();
 
-    document.getElementById('sim-play-btn').addEventListener('click', () => {
-        simMode ? stopSim() : startSim();
-    });
+    const syncBtn = document.getElementById('sim-sync-btn');
+    const videoEl = document.getElementById('sim-video');
+    if (syncBtn && videoEl) {
+        syncBtn.addEventListener('click', () => {
+            simMode = !simMode;
+            if (simMode) {
+                syncBtn.style.background = 'rgba(59,130,246,0.2)';
+                syncBtn.style.color = 'var(--accent)';
+                syncBtn.style.borderColor = 'var(--accent)';
+                syncBtn.textContent = '連動中 (クリックで解除)';
+                
+                const speedSelect = document.getElementById('sim-speed-select');
+                if (speedSelect) videoEl.playbackRate = parseFloat(speedSelect.value);
 
-    document.querySelectorAll('.sim-preset').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.getElementById('sim-datetime').value = btn.dataset.ts;
+                simInterval = setInterval(processVideoFrame, 100);
+                videoEl.play();
+            } else {
+                syncBtn.style.background = 'var(--bg-card)';
+                syncBtn.style.color = 'var(--text-hi)';
+                syncBtn.style.borderColor = 'var(--border-hi)';
+                syncBtn.textContent = '地図に連動させる';
+                if (simInterval) clearInterval(simInterval);
+            }
+        });
+
+        videoEl.addEventListener('play', () => {
+            if (simMode && !simInterval) simInterval = setInterval(processVideoFrame, 100);
+        });
+        videoEl.addEventListener('pause', () => {
+            if (simInterval) { clearInterval(simInterval); simInterval = null; }
+        });
+
+        const uploadEl = document.getElementById('sim-video-upload');
+        if (uploadEl) {
+            uploadEl.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const url = URL.createObjectURL(file);
+                videoEl.src = url;
+                videoEl.load();
+                // プレビューの再描画なども必要なら行う
+                if (simMode) {
+                    videoEl.play();
+                }
+            });
+        }
+    }
+
+    const previewWrap = document.getElementById('sim-preview-wrap');
+    const adjustModal = document.getElementById('sim-adjust-wrap');
+    if (previewWrap && adjustModal) {
+        let expanded = false;
+        previewWrap.addEventListener('click', () => {
+            expanded = !expanded;
+            if (expanded) {
+                adjustModal.style.position = 'fixed';
+                adjustModal.style.top = '50%';
+                adjustModal.style.left = '50%';
+                adjustModal.style.transform = 'translate(-50%, -50%)';
+                adjustModal.style.width = '80vw';
+                adjustModal.style.maxWidth = '800px';
+                adjustModal.style.boxShadow = '0 0 0 100vw rgba(0,0,0,0.8)';
+                adjustModal.style.zIndex = '99999';
+                adjustModal.style.padding = '16px';
+            } else {
+                adjustModal.style.position = 'relative';
+                adjustModal.style.top = 'auto';
+                adjustModal.style.left = 'auto';
+                adjustModal.style.transform = 'none';
+                adjustModal.style.width = 'auto';
+                adjustModal.style.maxWidth = 'none';
+                adjustModal.style.boxShadow = 'none';
+                adjustModal.style.zIndex = 'auto';
+                adjustModal.style.padding = '0';
+            }
+        });
+    }
+
+    // 入力値が変わったら一時停止中でも即座に反映
+    ['sim-crop-x', 'sim-crop-y', 'sim-crop-w', 'sim-crop-h', 'sim-debug-toggle'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('input', () => {
+            if (simMode) processVideoFrame();
         });
     });
+
+    const speedSelect = document.getElementById('sim-speed-select');
+    if (speedSelect && videoEl) {
+        speedSelect.addEventListener('change', () => {
+            videoEl.playbackRate = parseFloat(speedSelect.value);
+        });
+    }
 
     kmoniLoop();
 }

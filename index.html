@@ -15,6 +15,7 @@
         <button class="rail-btn active" data-panel="monitor" title="強震モニタ">
             <i class="fa-solid fa-wave-square"></i>
         </button>
+
         <button class="rail-btn" data-panel="eew" title="緊急地震速報">
             <i class="fa-solid fa-triangle-exclamation"></i>
             <span class="rail-badge" id="eew-badge" style="display:none"></span>
@@ -28,6 +29,9 @@
     </div>
 
     <div id="rail-bottom">
+        <button class="rail-btn" data-panel="sim" title="過去データ再生">
+            <i class="fa-solid fa-clock-rotate-left"></i>
+        </button>
         <button class="rail-btn" data-panel="settings" title="設定">
             <i class="fa-solid fa-gear"></i>
         </button>
@@ -41,27 +45,6 @@
     <div class="panel" id="panel-monitor">
         <div class="panel-header">強震モニタ</div>
 
-        <!-- 過去データ再生 -->
-        <div class="panel-section" id="sim-section">
-            <div class="sec-label">過去データ再生</div>
-            <div class="sim-presets">
-                <button class="sim-preset" data-ts="2024-01-01T16:10">能登半島 2024</button>
-                <button class="sim-preset" data-ts="2022-03-16T23:36">福島沖 2022</button>
-                <button class="sim-preset" data-ts="2016-04-16T01:25">熊本 2016</button>
-            </div>
-            <input type="datetime-local" id="sim-datetime" class="sim-input">
-            <div class="sim-row">
-                <button id="sim-play-btn" class="sim-play-btn">▶ 再生</button>
-                <select id="sim-speed" class="sim-speed">
-                    <option value="1">1×</option>
-                    <option value="2">2×</option>
-                    <option value="5">5×</option>
-                    <option value="10">10×</option>
-                </select>
-            </div>
-            <div id="sim-time" class="sim-time"></div>
-        </div>
-
         <div class="panel-section" style="margin-top:auto">
             <div class="sec-label">現在の最大震度</div>
             <div class="intensity-row">
@@ -69,6 +52,70 @@
                 <div>
                     <div class="int-value" id="max-int-value">計測値  −−</div>
                     <div class="int-point" id="max-int-point">−−</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 過去データ再生 -->
+    <div class="panel" id="panel-sim">
+        <div class="panel-header">過去データ再生</div>
+        <div class="panel-section">
+            <input type="file" id="sim-video-upload" accept="video/*" style="width: 100%; margin-bottom: 8px; font-size: 12px; color: var(--text-hi);">
+            <video id="sim-video" src="ダウンロード.mp4" controls width="100%" muted style="border-radius: 4px; border: 1px solid var(--border-hi);"></video>
+
+            <div id="sim-adjust-wrap" style="transition: all 0.2s; background: var(--bg-panel); border-radius: 4px;">
+                <div class="sec-label" style="margin-top:10px; display: flex; justify-content: space-between;">
+                    <span>プレビュー (クリックで拡大・縮小)</span>
+                </div>
+                <div id="sim-preview-wrap" style="position: relative; width: 100%; border: 1px solid #f87171; border-radius: 4px; overflow: hidden; background: #000; aspect-ratio: 352/400; cursor: pointer;">
+                    <canvas id="sim-preview-canvas" width="352" height="400" style="width: 100%; height: 100%; display: block;"></canvas>
+                    <img src="20260506204841.gif" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; animation: simBlink 1.5s infinite alternate;">
+                    <style>
+                        @keyframes simBlink {
+                            0% { opacity: 0; }
+                            100% { opacity: 0.8; }
+                        }
+                    </style>
+                </div>
+
+                <div class="sec-label" style="margin-top:10px;">トリミング調整 (X, Y, W, H)</div>
+                <div style="display:flex; gap: 4px; margin-top: 4px;">
+                    <input type="number" step="0.1" id="sim-crop-x" class="sim-input" value="124" placeholder="X">
+                    <input type="number" step="0.1" id="sim-crop-y" class="sim-input" value="-1" placeholder="Y">
+                    <input type="number" step="0.1" id="sim-crop-w" class="sim-input" value="352" placeholder="W">
+                    <input type="number" step="0.1" id="sim-crop-h" class="sim-input" value="400" placeholder="H">
+                </div>
+
+                <div style="margin-top: 10px; display: flex; align-items: center; gap: 8px;">
+                    <label style="font-size: 11px; color: var(--text-hi); display: flex; align-items: center; gap: 4px; cursor: pointer;">
+                        <input type="checkbox" id="sim-debug-toggle"> 判定ポイントを可視化（デバッグ）
+                    </label>
+                </div>
+            </div>
+
+            <div class="sim-row" style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 11px; color: var(--text-dim); white-space: nowrap;">再生速度:</span>
+                    <select id="sim-speed-select" style="flex: 1; background: var(--bg-card); color: var(--text-hi); border: 1px solid var(--border-hi); border-radius: 4px; padding: 2px;">
+                        <option value="0.2">0.2x (1fps相当)</option>
+                        <option value="0.5">0.5x</option>
+                        <option value="1.0" selected>1.0x (通常)</option>
+                        <option value="2.0">2.0x</option>
+                    </select>
+                </div>
+                <button id="sim-sync-btn" style="width:100%; padding: 6px; background: var(--bg-card); color: var(--text-hi); border: 1px solid var(--border-hi); border-radius: 4px; cursor: pointer;">
+                    地図に連動させる
+                </button>
+            </div>
+        </div>
+        <div class="panel-section" style="margin-top:auto">
+            <div class="sec-label">シミュレーション最大震度</div>
+            <div class="intensity-row">
+                <div class="int-badge int-none" id="sim-max-int-badge">−</div>
+                <div>
+                    <div class="int-value" id="sim-max-int-value">計測値  −−</div>
+                    <div class="int-point" id="sim-max-int-point">−−</div>
                 </div>
             </div>
         </div>
