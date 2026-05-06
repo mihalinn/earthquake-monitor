@@ -282,21 +282,20 @@ body { display: flex; }
 
 #int-scale-bar {
     width: 10px;
-    height: 144px;
+    height: 160px;
     border-radius: 3px;
     background: linear-gradient(to bottom,
         rgb(170,0,0),
-        rgb(208,0,0),
         rgb(245,0,0),
-        rgb(250,33,0),
         rgb(255,68,0),
-        rgb(255,106,0),
         rgb(255,144,0),
-        rgb(255,182,0),
         rgb(255,221,0),
         rgb(255,255,0),
-        rgb(222,255,5),
-        rgb(189,255,12)
+        rgb(189,255,12),
+        rgb(63,250,54),
+        rgb(0,208,139),
+        rgb(0,72,250),
+        rgb(0,0,205)
     );
 }
 
@@ -304,7 +303,7 @@ body { display: flex; }
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    height: 144px;
+    height: 160px;
 }
 
 #int-scale-labels span {

@@ -87,8 +87,8 @@ map.on('load', async () => {
         source: 'kmoni-points',
         paint: {
             'circle-radius': ['interpolate', ['linear'], ['zoom'],
-                4, ['get', 'size'],
-                10, ['*', ['get', 'size'], 2]
+                4, 3,
+                10, 6
             ],
             'circle-color':        ['get', 'color'],
             'circle-opacity':      0.9,

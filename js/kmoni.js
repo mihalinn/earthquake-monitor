@@ -80,9 +80,16 @@ function updateUI(maxV, maxName) {
     const pointEl = document.getElementById('max-int-point');
     const info    = floatToJmaClass(maxV);
 
-    badge.className = 'int-badge ' + (info ? info.cls : 'int-none');
-    badge.textContent = info ? info.label : '−';
-    valueEl.textContent = `計測値  ${maxV >= 0.5 ? maxV.toFixed(1) : '−−'}`;
+    if (info) {
+        badge.className = 'int-badge ' + info.cls;
+        badge.style.background = '';
+        badge.textContent = info.label;
+    } else {
+        badge.className = 'int-badge';
+        badge.style.background = intensityColor(maxV);
+        badge.textContent = maxV.toFixed(1);
+    }
+    valueEl.textContent = `計測値  ${maxV.toFixed(1)}`;
     pointEl.textContent = maxName || '−−';
 }
 
