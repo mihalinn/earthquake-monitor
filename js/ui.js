@@ -1,6 +1,7 @@
 // ── 時計 ──────────────────────────────
 const WEEKDAYS = ['日','月','火','水','木','金','土'];
 function tickClock() {
+    if (window.isPlaybackMode) return;
     const now = new Date();
     const hhmm = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false });
     const ss   = String(now.getSeconds()).padStart(2, '0');
@@ -23,10 +24,10 @@ document.querySelectorAll('.rail-btn[data-panel]').forEach(btn => {
         const target = btn.dataset.panel;
 
         if (activeTab === target && slidePanel.classList.contains('open')) {
-            // 同じタブを再クリック → 閉じる
             slidePanel.classList.remove('open');
             btn.classList.remove('active');
             activeTab = null;
+            applyTabLayers(null);
             return;
         }
 
@@ -37,8 +38,23 @@ document.querySelectorAll('.rail-btn[data-panel]').forEach(btn => {
         document.getElementById('panel-' + target).classList.add('active');
         slidePanel.classList.add('open');
         activeTab = target;
+        applyTabLayers(target);
     });
 });
+
+function applyTabLayers(tab) {
+    if (!window.mapReady) return;
+    const setVis = (id, show) => {
+        if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', show ? 'visible' : 'none');
+    };
+    setVis('kmoni-circles',         tab === 'monitor' || tab === 'sim');
+    setVis('eqinfo-epicenter-ring',  tab === 'eqinfo');
+    setVis('eqinfo-epicenter-dot',   tab === 'eqinfo');
+
+    if (tab === 'monitor' && typeof stopSimIfActive === 'function') stopSimIfActive();
+}
+
+window.addEventListener('mapReady', () => applyTabLayers(activeTab), { once: true });
 
 // 起動時: 強震モニタパネルを開いておく
 document.querySelector('.rail-btn[data-panel="monitor"]').click();

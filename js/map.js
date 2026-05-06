@@ -105,6 +105,100 @@ map.on('load', async () => {
         paint: { 'line-color': '#d0e4f7', 'line-width': 0.8 }
     });
 
+    // ── 地震情報 震源地 ──
+    map.addSource('eqinfo-epicenter', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] }
+    });
+    map.addLayer({
+        id: 'eqinfo-epicenter-ring',
+        type: 'circle',
+        source: 'eqinfo-epicenter',
+        paint: {
+            'circle-radius': 14,
+            'circle-color': 'rgba(0,0,0,0)',
+            'circle-stroke-width': 2,
+            'circle-stroke-color': '#ffffff',
+            'circle-stroke-opacity': 0.85
+        }
+    });
+    map.addLayer({
+        id: 'eqinfo-epicenter-dot',
+        type: 'circle',
+        source: 'eqinfo-epicenter',
+        paint: {
+            'circle-radius': 7,
+            'circle-color': ['get', 'color'],
+            'circle-opacity': 0.95,
+            'circle-stroke-width': 1.5,
+            'circle-stroke-color': '#ffffff'
+        }
+    });
+
+    // ── EEW 予報円 ──
+    map.addSource('eew-waves', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] }
+    });
+    map.addLayer({
+        id: 'eew-p-wave',
+        type: 'line',
+        source: 'eew-waves',
+        filter: ['==', 'type', 'P'],
+        paint: { 'line-color': '#4da6ff', 'line-width': 1.5, 'line-opacity': 0.8 }
+    });
+    map.addLayer({
+        id: 'eew-s-wave',
+        type: 'line',
+        source: 'eew-waves',
+        filter: ['==', 'type', 'S'],
+        paint: { 'line-color': '#ff4d4d', 'line-width': 2.5, 'line-opacity': 0.9 }
+    });
+
+    // ── EEW 震央 ──
+    map.addSource('eew-epicenter', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] }
+    });
+    map.addLayer({
+        id: 'eew-epicenter-mark',
+        type: 'line',
+        source: 'eew-epicenter',
+        paint: {
+            'line-color': '#ff0000',
+            'line-width': 3,
+            'line-opacity': 1
+        }
+    });
+    map.addLayer({
+        id: 'eew-epicenter-mark-white',
+        type: 'line',
+        source: 'eew-epicenter',
+        paint: {
+            'line-color': '#ffffff',
+            'line-width': 5,
+            'line-opacity': 0.9
+        }
+    });
+    // 白線を赤線の下に配置
+    map.moveLayer('eew-epicenter-mark-white', 'eew-epicenter-mark');
+
+    // 震央の中心ドット
+    map.addLayer({
+        id: 'eew-epicenter-center',
+        type: 'circle',
+        source: 'eew-epicenter',
+        filter: ['==', '$type', 'Point'], // 点データのみ
+        paint: {
+            'circle-radius': 3,
+            'circle-color': '#ffffff',
+            'circle-stroke-width': 1,
+            'circle-stroke-color': '#ff0000'
+        }
+    });
+
+    window.mapReady = true;
+    window.dispatchEvent(new Event('mapReady'));
     console.log('[Map] 読み込み完了');
 });
 

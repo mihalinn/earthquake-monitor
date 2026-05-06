@@ -14,12 +14,9 @@
     <div id="rail-tabs">
         <button class="rail-btn active" data-panel="monitor" title="強震モニタ">
             <i class="fa-solid fa-wave-square"></i>
+            <span class="rail-badge" id="monitor-eew-badge" style="display:none"></span>
         </button>
 
-        <button class="rail-btn" data-panel="eew" title="緊急地震速報">
-            <i class="fa-solid fa-triangle-exclamation"></i>
-            <span class="rail-badge" id="eew-badge" style="display:none"></span>
-        </button>
         <button class="rail-btn" data-panel="eqinfo" title="地震情報">
             <i class="fa-solid fa-circle-dot"></i>
         </button>
@@ -44,6 +41,23 @@
     <!-- 強震モニタ -->
     <div class="panel" id="panel-monitor">
         <div class="panel-header">強震モニタ</div>
+
+        <!-- EEW (発令中のみ表示) -->
+        <div id="eew-section" style="display:none">
+            <div class="eew-alert-header">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <span>緊急地震速報（警報）</span>
+                <span id="eew-serial" class="eew-serial-badge">第--報</span>
+            </div>
+            <div class="eew-alert-body">
+                <div class="int-badge int-none" id="eew-int-badge">−</div>
+                <div class="eew-info">
+                    <div class="eew-name" id="eew-name">--</div>
+                    <div class="eew-detail" id="eew-detail">M--  深さ--</div>
+                    <div class="eew-time" id="eew-time">--:--:--</div>
+                </div>
+            </div>
+        </div>
 
         <div class="panel-section" style="margin-top:auto">
             <div class="sec-label">現在の最大震度</div>
@@ -70,7 +84,7 @@
                 </div>
                 <div id="sim-preview-wrap" style="position: relative; width: 100%; border: 1px solid #f87171; border-radius: 4px; overflow: hidden; background: #000; aspect-ratio: 352/400; cursor: pointer;">
                     <canvas id="sim-preview-canvas" width="352" height="400" style="width: 100%; height: 100%; display: block;"></canvas>
-                    <img src="20260506204841.gif" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; animation: simBlink 1.5s infinite alternate;">
+                    <img src="20260506204841.gif" onerror="this.style.display='none'" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; animation: simBlink 1.5s infinite alternate;">
                     <style>
                         @keyframes simBlink {
                             0% { opacity: 0; }
@@ -108,6 +122,22 @@
                     地図に連動させる
                 </button>
             </div>
+            <div class="sim-row" style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 10px;">
+                <div class="sec-label">記録データ再生</div>
+                <div style="display: flex; gap: 4px; margin-top: 8px;">
+                    <select id="record-select" style="flex: 1; background: var(--bg-card); color: var(--text-hi); border: 1px solid var(--border-hi); border-radius: 4px; padding: 4px; font-size: 11px;">
+                        <option value="">記録を選択...</option>
+                    </select>
+                    <button onclick="refreshRecordList()" title="更新" style="padding: 4px 8px; background: var(--bg-card); color: var(--text-sub); border: 1px solid var(--border-hi); border-radius: 4px; cursor: pointer;">
+                        <i class="fa-solid fa-rotate"></i>
+                    </button>
+                </div>
+                <div style="display: flex; gap: 8px; margin-top: 8px;">
+                    <button id="record-play-btn" onclick="toggleRecordPlayback()" style="flex:1; padding: 6px; background: var(--bg-card); color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; cursor: pointer; font-size: 11px;">
+                        <i class="fa-solid fa-play" style="margin-right: 4px;"></i>再生
+                    </button>
+                </div>
+            </div>
         </div>
         <div class="panel-section" style="margin-top:auto">
             <div class="sec-label">シミュレーション最大震度</div>
@@ -121,21 +151,14 @@
         </div>
     </div>
 
-    <!-- EEW -->
-    <div class="panel" id="panel-eew">
-        <div class="panel-header">緊急地震速報</div>
-        <div class="panel-empty">
-            <i class="fa-solid fa-shield-check"></i>
-            <span>発令なし</span>
-        </div>
-    </div>
-
     <!-- 地震情報 -->
     <div class="panel" id="panel-eqinfo">
         <div class="panel-header">地震情報</div>
-        <div class="panel-empty">
-            <i class="fa-solid fa-circle-notch fa-spin"></i>
-            <span>準備中</span>
+        <div id="eqinfo-list">
+            <div class="panel-empty">
+                <i class="fa-solid fa-circle-notch fa-spin"></i>
+                <span>読み込み中</span>
+            </div>
         </div>
     </div>
 
@@ -156,6 +179,24 @@
             <div class="status-row">
                 <span class="dot dot-off" id="kmoni-dot"></span>
                 <span id="kmoni-status">強震モニタ: 未接続</span>
+            </div>
+        </div>
+
+        <div class="panel-section" style="margin-top: 10px; border-top: 1px solid var(--border); padding-top: 15px;">
+            <div class="sec-label">デバッグ / テスト</div>
+            <div style="display: flex; gap: 8px; margin-top: 8px;">
+                <button onclick="triggerTestEew()" style="flex:1; padding: 6px; background: var(--bg-card); color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; cursor: pointer; font-size: 11px;">
+                    緊急地震速報 表示テスト
+                </button>
+            </div>
+            <div id="recorder-status" style="font-size: 10px; color: var(--text-dim); margin-top: 8px; text-align: center; border: 1px dashed var(--border); padding: 4px; border-radius: 4px;">
+                <i class="fa-solid fa-circle" id="recorder-dot" style="color: var(--text-dim); font-size: 8px; margin-right: 4px;"></i>
+                自動記録: 待機中
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: 8px;">
+                <button id="manual-record-btn" onclick="toggleManualRecord()" style="flex:1; padding: 6px; background: var(--bg-card); color: #fff; border: 1px solid var(--border-hi); border-radius: 4px; cursor: pointer; font-size: 11px;">
+                    <i class="fa-solid fa-record-vinyl" style="margin-right: 4px;"></i>手動記録開始
+                </button>
             </div>
         </div>
     </div>
@@ -197,5 +238,9 @@
 <script src="js/map.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/kmoni.js"></script>
+<script src="js/eqinfo.js"></script>
+<script src="js/eew.js"></script>
+<script src="js/recorder.js"></script>
+<script src="js/player.js"></script>
 </body>
 </html>
